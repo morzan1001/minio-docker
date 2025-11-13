@@ -36,7 +36,7 @@ LABEL org.opencontainers.image.title="MinIO" \
     org.opencontainers.image.vendor="Community"
 
 RUN set -eux; \
-  apk add --no-cache ca-certificates tzdata util-linux;
+  apk add --no-cache ca-certificates curl tzdata util-linux;
 
 COPY --from=builder /out/minio /usr/bin/minio
 COPY dockerscripts/docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
