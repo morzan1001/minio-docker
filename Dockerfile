@@ -35,15 +35,14 @@ LABEL org.opencontainers.image.title="MinIO" \
       org.opencontainers.image.description="Minimal community build of MinIO server per upstream release tag." \
       org.opencontainers.image.source="https://github.com/minio/minio" \
       org.opencontainers.image.version="${MINIO_VERSION}" \
-      org.opencontainers.image.vendor="Community" \
-      org.opencontainers.image.licenses="AGPL-3.0-only"
+      org.opencontainers.image.vendor="Community"
 
 ENV MINIO_USER=minio \
     MINIO_GROUP=minio \
     MINIO_VOLUMEDIR=/data
 
 RUN set -eux; \
-    apk add --no-cache ca-certificates tzdata curl; \
+    apk add --no-cache ca-certificates curl tzdata; \
     addgroup -S "${MINIO_GROUP}"; \
     adduser -S -G "${MINIO_GROUP}" "${MINIO_USER}"; \
     mkdir -p "${MINIO_VOLUMEDIR}"
