@@ -46,7 +46,9 @@ RUN set -eux; \
     addgroup -S "${MINIO_GROUP}"; \
     adduser -S -G "${MINIO_GROUP}" "${MINIO_USER}"; \
     mkdir -p "${MINIO_VOLUMEDIR}"; \
-    chown -R "${MINIO_USER}:${MINIO_GROUP}" "${MINIO_VOLUMEDIR}"
+    chown -R "${MINIO_USER}:${MINIO_GROUP}" "${MINIO_VOLUMEDIR}"; \
+    install -d -m 750 -o "${MINIO_USER}" -g "${MINIO_GROUP}" "/home/${MINIO_USER}"; \
+    install -d -m 700 -o "${MINIO_USER}" -g "${MINIO_GROUP}" "/home/${MINIO_USER}/.minio/certs"
 
 COPY --from=builder /out/minio /usr/local/bin/minio
 
@@ -63,3 +65,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 CMD /usr/
 
 ENTRYPOINT ["/usr/local/bin/minio"]
 CMD ["server","/data","--console-address",":9001"]
+
+
+
+
