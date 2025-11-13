@@ -21,8 +21,10 @@ RUN set -eux; \
       amd64|arm64) ;; \
       *) echo "Unsupported TARGETARCH: ${goarch}" >&2; exit 1 ;; \
     esac; \
-    GOOS="${goos}" GOARCH="${goarch}" go install -trimpath -ldflags="-s -w" github.com/minio/minio/cmd/minio@"${MINIO_VERSION}"; \
-    test -x "/go/bin/minio"
+    mkdir -p /out; \
+    git clone --depth 1 --branch "${MINIO_VERSION}" https://github.com/minio/minio.git /src; \
+    cd /src; \
+    GOOS="${goos}" GOARCH="${goarch}" go build -trimpath -ldflags="-s -w" -o /out/minio ./cmd/minio
 
 FROM alpine:3.22.2
 
@@ -39,7 +41,7 @@ RUN set -eux; \
     mkdir -p "${MINIO_VOLUMEDIR}"; \
     chown -R "${MINIO_USER}:${MINIO_GROUP}" "${MINIO_VOLUMEDIR}"
 
-COPY --from=builder /go/bin/minio /usr/local/bin/minio
+COPY --from=builder /out/minio /usr/local/bin/minio
 
 USER ${MINIO_USER}:${MINIO_GROUP}
 
