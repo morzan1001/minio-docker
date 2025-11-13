@@ -24,7 +24,16 @@ RUN set -eux; \
     mkdir -p /out; \
     git clone --depth 1 --branch "${MINIO_VERSION}" https://github.com/minio/minio.git /src; \
     cd /src; \
-    GOOS="${goos}" GOARCH="${goarch}" go build -trimpath -ldflags="-s -w" -o /out/minio ./cmd/minio
+    build_dir="$(go list -f '{{if eq .Name "main"}}{{.Dir}}{{end}}' ./... | grep -E '/cmd/minio$' || true)"; \
+    if [ -z "${build_dir}" ]; then \
+      build_dir="$(go list -f '{{if eq .Name "main"}}{{.Dir}}{{end}}' ./... | head -n1)"; \
+    fi; \
+    if [ -z "${build_dir}" ]; then \
+      echo "Unable to locate MinIO main package" >&2; \
+      exit 1; \
+    fi; \
+    echo "Building from ${build_dir}"; \
+    GOOS="${goos}" GOARCH="${goarch}" go build -trimpath -ldflags="-s -w" -o /out/minio "${build_dir}"
 
 FROM alpine:3.22.2
 
