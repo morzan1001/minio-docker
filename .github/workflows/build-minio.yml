@@ -1,0 +1,111 @@
+name: Build MinIO Image
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: build-minio-image
+  cancel-in-progress: false
+
+jobs:
+  detect-and-build:
+    name: Detect and publish latest release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      OWNER: ${{ github.repository_owner }}
+      IMAGE_NAME: minio
+      UPSTREAM_REPO: minio/minio
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compose image coordinates
+        id: coords
+        run: |
+          set -euo pipefail
+          owner_lower="$(echo "${OWNER}" | tr '[:upper:]' '[:lower:]')"
+          image_repo="${owner_lower}/${IMAGE_NAME}"
+          echo "owner_lower=${owner_lower}" >> "$GITHUB_OUTPUT"
+          echo "image_repo=${image_repo}" >> "$GITHUB_OUTPUT"
+          echo "image_ref=${REGISTRY}/${image_repo}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Determine latest upstream release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          latest="$(gh release view --repo "${UPSTREAM_REPO}" --json tagName -q '.tagName')"
+          if [ -z "${latest}" ] || [ "${latest}" = "null" ]; then
+            echo "Failed to resolve latest release" >&2
+            exit 1
+          fi
+          echo "tag=${latest}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Log release tag
+        run: echo "Latest upstream release is ${{ steps.release.outputs.tag }}"
+        shell: bash
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if image already exists
+        id: image_check
+        run: |
+          if docker manifest inspect "${{ steps.coords.outputs.image_ref }}:${{ steps.release.outputs.tag }}" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          version="${{ steps.release.outputs.tag }}"
+          image_ref="${{ steps.coords.outputs.image_ref }}"
+          tags="${image_ref}:${version},${image_ref}:latest"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tags=${tags}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        if: steps.image_check.outputs.exists != 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            MINIO_VERSION=${{ steps.release.outputs.tag }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.release.outputs.tag }}
+            org.opencontainers.image.title=MinIO Server
+            org.opencontainers.image.description=MinIO server release ${{ steps.release.outputs.tag }} built from upstream
+          provenance: false
+
+      - name: Skip build (already published)
+        if: steps.image_check.outputs.exists == 'true'
+        run: echo "Image for release ${{ steps.release.outputs.tag }} already exists in GHCR, skipping."
+        shell: bash

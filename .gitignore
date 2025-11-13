@@ -1,0 +1,15 @@
+# Local environment
+.env
+.env.*
+
+# Logs and runtime artifacts
+*.log
+*.pid
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/
+.idea/
