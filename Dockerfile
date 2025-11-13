@@ -6,65 +6,53 @@ ARG TARGETOS=linux
 ARG TARGETARCH
 ARG MINIO_VERSION
 
-ENV CGO_ENABLED=0
+ENV CGO_ENABLED=0 \
+  GO111MODULE=on
 
-RUN apk add --no-cache git
+RUN apk add --no-cache ca-certificates git
 
 RUN set -eux; \
-    : "${MINIO_VERSION:?Build argument MINIO_VERSION is required}"; \
-    goos="${TARGETOS:-linux}"; \
-    goarch="${TARGETARCH:-}"; \
-    if [ -z "${goarch}" ]; then \
-      goarch="$(go env GOARCH)"; \
-    fi; \
-    case "${goarch}" in \
-      amd64|arm64) ;; \
-      *) echo "Unsupported TARGETARCH: ${goarch}" >&2; exit 1 ;; \
-    esac; \
-    mkdir -p /out; \
-    git clone --depth 1 --branch "${MINIO_VERSION}" https://github.com/minio/minio.git /src; \
-    cd /src; \
-    echo "Building from repository root"; \
-    GOOS="${goos}" GOARCH="${goarch}" go build -trimpath -ldflags="-s -w" -o /out/minio .
+  : "${MINIO_VERSION:?Build argument MINIO_VERSION is required}"; \
+  goos="${TARGETOS:-$(go env GOOS)}"; \
+  goarch="${TARGETARCH:-$(go env GOARCH)}"; \
+  case "${goarch}" in \
+    amd64|arm64) ;; \
+    *) echo "Unsupported TARGETARCH: ${goarch}" >&2; exit 1 ;; \
+  esac; \
+  git clone --depth 1 --branch "${MINIO_VERSION}" https://github.com/minio/minio.git /src; \
+  cd /src; \
+  export GOOS="${goos}" GOARCH="${goarch}"; \
+  ldflags="$(go run buildscripts/gen-ldflags.go)"; \
+  go build -tags kqueue -trimpath --ldflags "${ldflags}" -o /out/minio
 
 FROM alpine:3.22.2
 
 ARG MINIO_VERSION
 
 LABEL org.opencontainers.image.title="MinIO" \
-      org.opencontainers.image.description="Minimal community build of MinIO server per upstream release tag." \
-      org.opencontainers.image.source="https://github.com/minio/minio" \
-      org.opencontainers.image.version="${MINIO_VERSION}" \
-      org.opencontainers.image.vendor="Community"
-
-ENV MINIO_USER=minio \
-    MINIO_GROUP=minio \
-    MINIO_VOLUMEDIR=/data
+    org.opencontainers.image.description="Community build of MinIO server per upstream release tag." \
+    org.opencontainers.image.source="https://github.com/morzan1001/minio-docker" \
+    org.opencontainers.image.version="${MINIO_VERSION}" \
+    org.opencontainers.image.vendor="Community"
 
 RUN set -eux; \
-    apk add --no-cache ca-certificates curl tzdata; \
-    addgroup -S "${MINIO_GROUP}"; \
-    adduser -S -G "${MINIO_GROUP}" "${MINIO_USER}"; \
-    mkdir -p "${MINIO_VOLUMEDIR}"; \
-    chown -R "${MINIO_USER}:${MINIO_GROUP}" "${MINIO_VOLUMEDIR}"; \
-    install -d -m 750 -o "${MINIO_USER}" -g "${MINIO_GROUP}" "/home/${MINIO_USER}"; \
-    install -d -m 700 -o "${MINIO_USER}" -g "${MINIO_GROUP}" "/home/${MINIO_USER}/.minio/certs"
+  apk add --no-cache ca-certificates tzdata util-linux;
 
-COPY --from=builder /out/minio /usr/local/bin/minio
+COPY --from=builder /out/minio /usr/bin/minio
+COPY dockerscripts/docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
 
-RUN set -eux; \
-    chmod +x /usr/local/bin/minio; \
-    chown "${MINIO_USER}:${MINIO_GROUP}" /usr/local/bin/minio
+RUN chmod +x /usr/bin/minio /usr/bin/docker-entrypoint.sh
 
-USER ${MINIO_USER}:${MINIO_GROUP}
-
+EXPOSE 9000
 VOLUME ["/data"]
-EXPOSE 9000 9001
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 CMD /usr/local/bin/minio --version > /dev/null || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 CMD minio --version >/dev/null || exit 1
 
-ENTRYPOINT ["/usr/local/bin/minio"]
-CMD ["server","/data","--console-address",":9001"]
+ENTRYPOINT ["/usr/bin/docker-entrypoint.sh"]
+CMD ["minio"]
+
+
+
 
 
 
