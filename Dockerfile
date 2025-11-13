@@ -35,7 +35,7 @@ LABEL org.opencontainers.image.title="MinIO" \
       org.opencontainers.image.description="Minimal community build of MinIO server per upstream release tag." \
       org.opencontainers.image.source="https://github.com/minio/minio" \
       org.opencontainers.image.version="${MINIO_VERSION}" \
-      org.opencontainers.image.vendor="Community" \
+      org.opencontainers.image.vendor="Community"
 
 ENV MINIO_USER=minio \
     MINIO_GROUP=minio \
@@ -63,6 +63,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 CMD /usr/
 
 ENTRYPOINT ["/usr/local/bin/minio"]
 CMD ["server","/data","--console-address",":9001"]
-
-
-
