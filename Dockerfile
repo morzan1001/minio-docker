@@ -35,7 +35,7 @@ LABEL org.opencontainers.image.title="MinIO" \
       org.opencontainers.image.description="Minimal community build of MinIO server per upstream release tag." \
       org.opencontainers.image.source="https://github.com/minio/minio" \
       org.opencontainers.image.version="${MINIO_VERSION}" \
-      org.opencontainers.image.vendor="Community"
+      org.opencontainers.image.vendor="Community" \
 
 ENV MINIO_USER=minio \
     MINIO_GROUP=minio \
@@ -45,7 +45,8 @@ RUN set -eux; \
     apk add --no-cache ca-certificates curl tzdata; \
     addgroup -S "${MINIO_GROUP}"; \
     adduser -S -G "${MINIO_GROUP}" "${MINIO_USER}"; \
-    mkdir -p "${MINIO_VOLUMEDIR}"
+    mkdir -p "${MINIO_VOLUMEDIR}"; \
+    chown -R "${MINIO_USER}:${MINIO_GROUP}" "${MINIO_VOLUMEDIR}"
 
 COPY --from=builder /out/minio /usr/local/bin/minio
 
@@ -62,3 +63,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 CMD /usr/
 
 ENTRYPOINT ["/usr/local/bin/minio"]
 CMD ["server","/data","--console-address",":9001"]
+
+
+
