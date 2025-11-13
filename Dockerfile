@@ -39,18 +39,27 @@ FROM alpine:3.22.2
 
 ARG MINIO_VERSION
 
+LABEL org.opencontainers.image.title="MinIO" \
+      org.opencontainers.image.description="Minimal community build of MinIO server per upstream release tag." \
+      org.opencontainers.image.source="https://github.com/minio/minio" \
+      org.opencontainers.image.version="${MINIO_VERSION}" \
+      org.opencontainers.image.vendor="Community"
+
 ENV MINIO_USER=minio \
     MINIO_GROUP=minio \
     MINIO_VOLUMEDIR=/data
 
 RUN set -eux; \
-    apk add --no-cache ca-certificates tzdata; \
+    apk add --no-cache ca-certificates tzdata curl; \
     addgroup -S "${MINIO_GROUP}"; \
     adduser -S -G "${MINIO_GROUP}" "${MINIO_USER}"; \
-    mkdir -p "${MINIO_VOLUMEDIR}"; \
-    chown -R "${MINIO_USER}:${MINIO_GROUP}" "${MINIO_VOLUMEDIR}"
+    mkdir -p "${MINIO_VOLUMEDIR}"
 
 COPY --from=builder /out/minio /usr/local/bin/minio
+
+RUN set -eux; \
+    chmod +x /usr/local/bin/minio; \
+    chown "${MINIO_USER}:${MINIO_GROUP}" /usr/local/bin/minio
 
 USER ${MINIO_USER}:${MINIO_GROUP}
 
