@@ -25,7 +25,7 @@ RUN set -eux; \
   ldflags="$(go run buildscripts/gen-ldflags.go)"; \
   go build -tags kqueue -trimpath --ldflags "${ldflags}" -o /out/minio
 
-FROM alpine:3.24.1
+FROM alpine:3.24.2
 
 ARG MINIO_VERSION
 
